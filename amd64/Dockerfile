@@ -1,107 +1,31 @@
 # syntax=docker/dockerfile:1
 
-ARG DEEPIN_MIRROR="http://mirrors.ustc.edu.cn/deepin/"
-ARG DEEPIN_RELEASE="apricot"
-ARG DEEPIN_ROOTFS="/deepin-rootfs"
-
-FROM debian:stable as init-builder
-
-ARG DEEPIN_MIRROR
-ARG DEEPIN_RELEASE
-ARG DEEPIN_ROOTFS
+FROM docker-deepin-wine6 as deepin-wine6
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV AUDIO_GID=63
+ENV VIDEO_GID=39
+ENV GID=1000
+ENV UID=1000
 
-RUN mkdir -p $DEEPIN_ROOTFS/etc/apt /var/lib/debootstrap-cache && \
-  sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list && \
-  sed -i 's/security.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list && \
-  apt update && apt-get install -y multistrap gnupg
+#RUN apt update && apt install -y com.qq.weixin.deepin
 
-FROM init-builder as prepare-builder
+RUN apt update && apt install -y curl && \
+  curl -L -o /wechat.deb \
+    https://com-store-packages.uniontech.com/appstore/pool/appstore/c/com.qq.weixin.deepin/com.qq.weixin.deepin_3.4.0.38deepin6_i386.deb && \
+  apt install -y -f ./wechat.deb
 
-ARG DEEPIN_MIRROR
-ARG DEEPIN_RELEASE
-ARG DEEPIN_ROOTFS
+RUN mkdir /WeChatFiles && \
+    chown -R deepin:deepin /WeChatFiles && \
+    ln -s "/WeChatFiles" "/home/deepin/WeChat Files"
 
-COPY trusted.gpg.d/* /etc/apt/trusted.gpg.d/
-COPY trusted.gpg.d/* $DEEPIN_ROOTFS/etc/apt/trusted.gpg.d/
+VOLUME ["/WeChatFiles", "/home/deepin/.deepinwine"]
 
-RUN <<EOF cat > /deepin.multistrap
-[General]
-arch=amd64
-directory=$DEEPIN_ROOTFS
-cleanup=true
-noauth=true
-unpack=true
-explicitsuite=false
-multiarch=
-aptsources=Debian
-bootstrap=Deepin
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod a+x /entrypoint.sh
 
-[Deepin]
-packages=apt
-source=$DEEPIN_MIRROR
-keyring=debian-archive-keyring
-suite=$DEEPIN_RELEASE
-EOF
-
-RUN <<EOF cat > $DEEPIN_ROOTFS/etc/apt/sources.list
-deb $DEEPIN_MIRROR $DEEPIN_RELEASE main non-free contrib
-EOF
-
-RUN <<EOF cat > $DEEPIN_ROOTFS/cleanup
-#! /bin/sh
-env DEBIAN_FRONTEND=noninteractive apt-get autoremove -y
-apt-get clean
-find /var/lib/apt/lists -type f -delete
-find /var/cache -type f -delete
-find /var/log -type f -delete
-exit 0
-EOF
-
-RUN chmod a+x $DEEPIN_ROOTFS/cleanup
-
-
-FROM prepare-builder as run-builder
-RUN multistrap -f /deepin.multistrap
-
-FROM run-builder as builder
-
-ARG DEEPIN_ROOTFS
-
-RUN chroot $DEEPIN_ROOTFS /usr/bin/apt-get update && \
-  chroot $DEEPIN_ROOTFS env DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y && \
-  chroot $DEEPIN_ROOTFS /cleanup
-
-FROM scratch as deepin
-
-ARG DEEPIN_MIRROR
-ARG DEEPIN_RELEASE
-ARG DEEPIN_ROOTFS
-
-ENV DEBIAN_FRONTEND=noninteractive
-ENV SHELL=/bin/bash
-ENV LANG=en_US.UTF-8
-
-COPY --from=builder $DEEPIN_ROOTFS /
-
-RUN <<EOF cat > /etc/apt/sources.list
-deb $DEEPIN_MIRROR $DEEPIN_RELEASE main non-free contrib
-EOF
-
-RUN apt update && apt install -y --no-install-recommends apt-transport-https \
-  ca-certificates \
-  dbus-x11 \
-  deepin-keyring \
-  gnupg \
-  libcups2 \
-  libpulse0 \
-  libxv1 \
-  locales-all
-
-RUN <<EOF cat > /etc/apt/sources.list.d/appstore.list
-# Written by deepin-home-appstore-client
-deb https://com-store-packages.uniontech.com/appstore deepin appstore
-EOF
-
-RUN apt update
+ENV LANGUAGE=zh_CN.UTF-8
+ENV LC_ALL=zh_CN.UTF-8
+ENV LANG=zh_CN.UTF-8
+ENV TZ=UTC-8
+ENTRYPOINT /entrypoint.sh

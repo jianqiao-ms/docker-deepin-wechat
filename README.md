@@ -1,5 +1,8 @@
 > Refer:
 > 
+> The Very First  
+> https://github.com/top-bettercode/docker-wine
+> 
 > Build docker image of deepin  
 > https://github.com/mviereck/dockerfile-x11docker-deepin/blob/master/Dockerfile
 > 
@@ -13,3 +16,6 @@
 > https://www.docker.com/blog/introduction-to-heredocs-in-dockerfiles/  
 > https://docs.docker.com/build/building/packaging/  
 > https://docs.docker.com/build/buildkit/
+> 
+> Nvidia driver in docker  
+> https://github.com/top-bettercode/docker-wechat/blob/master/Dockerfile
